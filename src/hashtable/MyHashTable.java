@@ -1,289 +1,334 @@
 package hashtable;
 
-/**
- * Class that represents simple realization of hashtable that can contain key-value pairs.
- *
- * <p>This class realizing hashtable using array and linked nodes for resolving collisions.
- * This class supports addition, edition, deletion keys and getting by key and value.</p>
- *
- * @param <K> Type of key, that will be using in hashtable
- * @param <V> Type of values, that will be associated with keys in hashtable
- */
-public class MyHashTable<K, V> {
-    /**
-     * HashNode class for the MyHashTable class
-     * It is a class for storing a key-value pair
-     *
-     * @param <K> Any immutable type that implements Objects.hashCode() method.
-     * @param <V> Any object.
-     */
-    private static class HashNode<K, V> {
-        final K key;
-        V value;
-        HashNode<K, V> next;
+import java.util.ArrayList;
+import java.util.NoSuchElementException;
 
-        /**
-         * Create node with key and value
-         *
-         * @param key   Key of the node
-         * @param value Value of the node
-         */
-        HashNode(K key, V value) {
+
+public class MyHashTable <K, V>{
+
+    private class HashNode<K, V>{
+        private final K key;
+        private V value;
+        private HashNode<K, V> next;
+
+        public HashNode(K key, V value){
             this.key = key;
             this.value = value;
+        }
 
-            this.next = null;
+        /*
+         * Finds the number of nodes until the end of the bucket.
+         *
+         * Time complexity: O(N), where N is the number of nodes in the bucket.
+         *
+         * @return the number of nodes until the end of the bucket.
+         */
+        private int chainLength(){
+            int length = 0;
+            HashNode<K, V> node = this;
+            while(node != null){
+                length++;
+                node = node.next;
+            }
+            return length;
         }
 
         @Override
-        public String toString() {
+        public String toString(){
             return "{" + key + " " + value + "}";
         }
     }
+    private HashNode<K,V>[] chainArray;
+    private int M = 11;
+    private int size = 0;
 
-    /**
-     * Array that contains nodes.
-     */
-    private HashNode<K, V>[] chainArray;
-
-    /**
-     * Default size of array, size.
-     */
-    private static final int DEFAULT_SIZE = 11;
-
-    /**
-     * Current load of hashtable. Count of nodes in array.
-     */
-    private int size;
-
-    /**
-     * Default constructor that creating array with default size.
-     */
-    public MyHashTable() {
-        chainArray = createArray(DEFAULT_SIZE);
+    private void initializeChainArray(){
+        chainArray = (HashNode<K,V>[]) new HashNode[M];
     }
 
-    /**
-     * Constructor with manual setting the size of the array.
-     *
-     * @param size Base size of the array
+    /*
+     * Constructor with default number of buckets.
      */
-    public MyHashTable(int size) {
-        if (size <= 0)
-            throw new IllegalArgumentException("Size must be positive value!");
-        chainArray = createArray(size);
+    public MyHashTable(){
+        initializeChainArray();
     }
 
-    /**
-     * Adds a key-value pair to the HashTable.
-     * Executing increaseSize method for checking remaining size.
-     * Calculates the index of the key in the chainArray.
-     * If the slot at the calculated index is empty, inserts the new node directly.
-     * If the slot at the index have nodes, iterates through the chain to find the key.
-     * If the key is found, updates the value of the existing key-value pair.
-     * If the key is not found in the chain, appends the new key-value pair to the end of the chain.
-     *
-     * @param key   The key to be inserted.
-     * @param value The value associated with the key.
+    /*
+     * Constructor with custom number of buckets.
      */
-    public void put(K key, V value) {
-        increaseSize(); // Size check inside the function.
+    public MyHashTable(int M){
+        this.M = M;
+        initializeChainArray();
+    }
 
-        int index = getIndex(key);
-        HashNode<K, V> newNode = new HashNode<>(key, value);
+    /*
+     * Checks if the object passed is null.
+     *
+     * Time complexity: O(1).
+     *
+     * @param o the object to be checked.
+     * @throws NullPointerException if the object passed is null.
+     */
+    private void checkNull(Object o){
+        if(o == null)
+            throw new NullPointerException();
+    }
 
+    /*
+     * Returns index of the bucket by hash of the key.
+     * The bucket is determined by key.hashCode() % M.
+     * Where M is number of buckets.
+     *
+     * Time complexity is that of the key's hashCode method.
+     *
+     * @param key the key to an object in HashTable.
+     * @return index of the bucket of the key.
+     */
+    private int hash(K key){
+        checkNull(key);
+        return (key.hashCode()%M + M)%M;
+    }
+    /*
+     * Helper method. Returns the closest larger prime number to provided one.
+     * Uses sequential search through numbers larger than the argument.
+     * Test each with divisors from 2 to less or equal to sqrt(tested number).
+     *
+     * Time complexity: (N * sqrt(A)), where N is an amount of numbers tested,
+     * and A is the largest number tested.
+     *
+     * @param cur the number before the one from which the search starts.
+     * @return the closest larger prime to the provided number.
+     */
+    private int getClosestLargerPrime(int cur){
+        for(int i = cur+1;;i++){
+            boolean good = true;
+            for(int j = 2; j*j <= i; j++){
+                if(i%j == 0){
+                    good = false;
+                    break;
+                }
+            }
+            if(good)
+                return i;
+        }
+    }
 
-        if (chainArray[index] == null) {
+    /*
+     * Doubles number of buckets when the load of the table exceeds the load factor.
+     *
+     * Time complexity: O(N), where N is the number of pairs inserted.
+     */
+    private void resize(){
+        M = getClosestLargerPrime(M*2);
+        HashNode<K,V>[] oldChainArray = chainArray;
+        initializeChainArray();
+        for(var node : oldChainArray){
+            if(node == null)continue;
+            while(node != null){
+                // Put every key-value pair from old chainArray to new one.
+                put(node.key, node.value);
+                // The size increased using put method, but actual size stays the same.
+                size--;
+                node = node.next;
+            }
+        }
+    }
+
+    /*
+     * Puts the key, value pair in the HashTable.
+     * Finds the bucket of the key through hash() method.
+     * If some node already has identical key,
+     * then changes value of the node to value argument.
+     * Otherwise, puts node with the pair in the front of the chain of the bucket.
+     * Resizes the table if the load exceeds the load factor.
+     *
+     * Time complexity: O(N), where N is the number of pairs inserted; Θ(1).
+     *
+     * @param key the key to the value.
+     * @param value the value for the key.
+     */
+    public void put(K key, V value){
+        checkNull(key);
+        HashNode<K, V> existingNode;
+        try{
+            // If node with key=key already exists, then change value.
+            existingNode = getNodeByKey(key);
+            existingNode.value = value;
+        }catch (NoSuchElementException e){
+            // If node with key=key does not exist, then put new node to the head of the chain.
+            int index = hash(key);
+            HashNode<K, V> newNode = new HashNode<>(key, value);
+            newNode.next = chainArray[index];
             chainArray[index] = newNode;
             size++;
-            return;
+            // Resize the table if the load exceeds the load factor.
+            if((double)size/M > 0.7)
+                resize();
         }
-
-        HashNode<K, V> node = chainArray[index];
-        while (node != null) {
-            if (node.key.equals(key)) {
-                node.value = value;
-                return;
-            }
-            if (node.next == null)
-                break;
-            node = node.next;
-        }
-        if (node == null)
-            throw new NullPointerException("Something went wrong. Node element cannot be null.");
-        node.next = newNode;
-        size++;
     }
 
-    /**
-     * This method finding the mapped value for key in HashTable.
-     * The value getting by calculating the index by key.
-     * Then checking every node in index position of the array for key.
-     * If node with valid key presents, returning mapped value, null otherwise.
+    /*
+     * Helper method. Finds the node by the key.
+     * Finds the bucket of the key through hash() method.
+     * If the bucket is empty or cannot find node with key=key, then return null.
+     * Otherwise, return node with key=key.
      *
-     * @param key Key object for getting value.
-     * @return Value of mapped key in HashTable or null.
+     * Time complexity: O(N), where N is the number of pairs inserted; Θ(1);
+     *
+     * @param key the key of the node.
+     * @return the node with key=key;
+     * @throws NoSuchElementException if no node with key=key was found.
      */
-    public V get(K key) {
-        int index = getIndex(key);
-        HashNode<K, V> node = chainArray[index];
-        while (node != null) {
-            if (node.key.equals(key)) return node.value;
+    private HashNode<K, V> getNodeByKey(K key){
+        checkNull(key);
+        HashNode<K, V> node = chainArray[hash(key)];
+        while(node != null && !node.key.equals(key))
             node = node.next;
+        if(node == null) {
+            throw new NoSuchElementException("No value with key = " + key + " was found.");
         }
-
-        return null;
+        return node;
     }
 
-    /**
-     * Method for removing key and value from HashTable.
-     * This method calculating index of the key in chainArray.
-     * If node at index position is null, null will be returned.
-     * If node at index is alone, asserting that node have correct key then deleting.
-     * If node doesn't alone, going through every node at index position.
-     * In case of absence the node with key that equal given key, null be returned.
-     * When node was found, returning value and cutting the node from chain.
+    /*
+     * Finds the value by the key.
+     * Finds the bucket of the key through hash() method.
+     * If the bucket is empty or cannot find node with key=key, then throw NoSuchElementException.
+     * Otherwise, return the node with key=key.
      *
-     * @param key Key for deletion "key-value" pair.
-     * @return Value of key that deleted or null if key doesn't present.
+     * Time complexity: O(N), where N is the number of pairs inserted; Θ(1);
+     *
+     * @param key the key of the value.
+     * @return the node with key=key;
+     * @throws NoSuchElementException if value with key=key was found.
+     */
+    public V get(K key){
+        checkNull(key);
+        HashNode<K, V> node = getNodeByKey(key);
+        return node.value;
+    }
+
+    /*
+     * Helper method. Finds the previous node of the node with key=key.
+     * Finds the bucket of the key through hash() method.
+     * If the bucket is empty or cannot find node with key=key, then throw NoSuchElementException.
+     * Otherwise, return the previous node of the node with key=key.
+     *
+     * Time complexity: O(N), where N is the number of pairs inserted; Θ(1);
+     *
+     * @param key the key of the node.
+     * @return the previous node of the node with key=key;
+     * @throws NoSuchElementException if no node with key=key was found.
+     */
+    private HashNode<K, V> getPrevNodeByKey(K key){
+        checkNull(key);
+        HashNode<K, V> node = chainArray[hash(key)], prev = null;
+        while(node != null && !node.key.equals(key)) {
+            prev = node;
+            node = node.next;
+        }
+        if(node == null)
+            throw new NoSuchElementException("No value with key = " + key + " was found.");
+        return prev;
+    }
+
+    /*
+     * Removes the key-value pair from the table.
+     * Finds the bucket of the key through hash() method.
+     * If the bucket is empty or cannot find node with key=key, then throw NoSuchElementException.
+     * Otherwise, delete the node with key=key, and return the value of the node.
+     *
+     * Time complexity: O(N), where N is the number of pairs inserted; Θ(1);
+     *
+     * @param key the key of the value.
+     * @return the value of the removed node.
+     * @throws NoSuchElementException if value with key=key was found.
      */
     public V remove(K key) {
-        int index = getIndex(key);
-
-        HashNode<K, V> node = chainArray[index];
-        if (node == null) return null; // If node equals null, returning null.
+        checkNull(key);
+        int index = hash(key);
+        HashNode<K, V> prevNode = getPrevNodeByKey(key);
         V value;
-
-        // Case for alone node at index position.
-        if (node.key.equals(key)) {
+        // If the previous node is null, then the node to be removed is the head of the bucket.
+        if (prevNode == null) {
             value = chainArray[index].value;
             chainArray[index] = null;
-            return value;
         }
-
-        // Case for node is not alone, have node.next nodes.
-        while (node.next != null) {
-            if (node.next.key.equals(key)) {
-                value = node.next.value;
-                node.next = node.next.next;
-                return value;
-            }
-            node = node.next;
+        // Otherwise, the next node of the previous node is the next of the node to be removed.
+        else {
+            value = prevNode.next.value;
+            prevNode.next = prevNode.next.next;
         }
-
-        return null;
+        size--;
+        return value;
     }
 
-    /**
-     * Method that checking if value have any key in HashTable.
-     * Method goes through every element in array and node.
-     * If value doesn't present in HashTable, false will return, otherwise true.
+    /*
+     * Checks if the value with key=key is in the table.
+     * Finds the bucket of the key through hash() method.
+     * If the bucket is empty or cannot find node with key=key, then throw NoSuchElementException.
+     * Otherwise, delete the node with key=key, and return the value of the node.
      *
-     * @param value Value for finding key
-     * @return True if key for value exists, false otherwise.
-     */
-    public boolean contains(V value) {
-        return getKey(value) != null;
-    }
-
-    /**
-     * Method for finding key by value in "key-value" pair.
-     * Method goes through every element in array and every node.
-     * If HashTable doesn't contain key for this value, null will return.
+     * Time complexity: O(N), where N is the number of pairs inserted; Θ(1);
      *
-     * @param value Value for finding key in "key-value" pair.
-     * @return Key or null.
+     * @param key the key of the value.
+     * @return true if the value with key=key is in the table, false otherwise.
+     * @throws NoSuchElementException if value with key=key was found.
      */
-    public K getKey(V value) {
-        for (HashNode<K, V> node : chainArray)
-            while (node != null) {
-                if (node.value.equals(value)) return node.key;
-                node = node.next;
-            }
-        return null;
+    public boolean contains(K key){
+        try {
+            getNodeByKey(key);
+            return true;
+        }catch(Exception e) {
+            return false;
+        }
     }
-
-    /**
-     * Goes through every element and adding hashNode string to StringBuilder.
-     * Returns HashTable in this format: "MyHashTable{hashNode, hashNode, hashNode, ...}"
-     */
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("MyHashTable{");
-        for (HashNode<K, V> node : chainArray)
-            while (node != null) {
-                builder.append(node).append(",");
-                node = node.next;
-            }
-        builder.append("}");
-        return builder.toString();
-    }
-
-    /**
-     * Method that creating new empty array with size M.
-     * Returns empty array of HashNodes with generic types of Key and Value.
-     * Every element in array is null.
+    /*
+     * Finds the key with value=value.
+     * Brute force through the table.
      *
-     * @param M Size of the new array.
-     * @return New empty array of HashNodes
-     */
-    @SuppressWarnings("unchecked")
-    private HashNode<K, V>[] createArray(int M) {
-        return new HashNode[M];
-    }
-
-    /**
-     * Increasing size of the array if HashTable filled on 75%.
-     * If HashTable doesn't filled on 75%, method will be ignored.
-     * Saving old array then creating new array.
-     * Old array used in reindexing method.
-     */
-    private void increaseSize() {
-        if (size < chainArray.length * 3 / 4) return;
-
-        HashNode<K, V>[] oldChain = chainArray;
-        chainArray = createArray(chainArray.length * 2);
-        reIndex(oldChain);
-    }
-
-    /**
-     * Going through every element and node in old array and putting it to the new.
-     * New array is this.chainArray.
-     * Method use old array as reference for nodes,
-     * then using put() method for adding elements to existing new array.
+     * Time complexity: O(N+M), where N is the number of pairs inserted,
+     * and M is the number of buckets.
      *
-     * @param oldChain Old array of HashNodes
+     * @param value the value of the node.
+     * @return the key of the value;
+     * @throws NoSuchElementException if no key with value=value was found.
      */
-    private void reIndex(HashNode<K, V>[] oldChain) {
-        for (HashNode<K, V> node : oldChain) {
-            while (node != null) {
-                put(node.key, node.value);
+    public K getKey(V value){
+        for(var node : chainArray){
+            while(node != null){
+                if(node.value.equals(value))return node.key;
                 node = node.next;
             }
         }
+        throw new NoSuchElementException("No key with value = " + value + " was found.");
     }
 
-    /**
-     * Using default Object method for calculating hash of the object.
+    /*
+     * Returns sizes of buckets of the table.
      *
-     * @param key Key object for node.
-     * @return Integer of hash the key object.
+     * Time complexity: O(N+M), where N is the number of pairs inserted,
+     * and M is the number of buckets.
+     *
+     * @return sizes of buckets.
      */
-    private int hash(K key) {
-        return key.hashCode();
+    public ArrayList<Integer> getBucketSizes(){
+        ArrayList<Integer> bucketSizes = new ArrayList<>();
+        for(var node : chainArray) {
+            if (node == null) {
+                bucketSizes.add(0);
+            } else {
+                bucketSizes.add(node.chainLength());
+            }
+        }
+        return bucketSizes;
     }
 
-    /**
-     * This method takes hashCode from key object
-     * and using the remainder of the division the hash by the length of this.chainArray.
-     * Returning value, that greater or equal than 0 and lesser than length of the array.
-     *
-     * @param key Key object for calculating index.
-     * @return Index position for key in this.chainArray from 0 inclusive to array length not inclusive.
-     */
-    private int getIndex(K key) {
-        int hash = hash(key);
-        return Math.abs(hash) % chainArray.length;
+    public int size(){
+        return size;
+    }
+
+    public int getM() {
+        return M;
     }
 }

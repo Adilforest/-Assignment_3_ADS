@@ -1,63 +1,83 @@
 import hashtable.MyHashTable;
-import test_hashtable.MyKey;
 import test_hashtable.TestMyHashTable;
 import tree.BST;
 
+import java.util.List;
+import java.util.Random;
+
+import static java.lang.Math.max;
 
 public class Main {
-    public static void main(String[] args) {
-//        BST<Integer, Integer> bst = new BST<>();
 
+    private static final Random rnd = new Random();
+    private static final int sampleSize = 10000;
 
-//        bst.put(6, 1);
-//        bst.put(3, 2);
-//        bst.put(7, 3);
-//        bst.put(4, 4);
-//        bst.put(2, 5);
-//        bst.put(9, 6);
-//        bst.put(5, 7);
+    private static final MyHashTable<TestMyHashTable, Integer> table = new MyHashTable<>();
+    private static final BST<Integer, Integer> tree = new BST<>();
 
-
-
-//        System.out.println(bst);
-//        bst.put(5, 8);
-//        System.out.println(bst);
-//        System.out.println(bst.get(9));
-//        bst.remove(4);
-//        System.out.println(bst);
-
-
-        MyKey key1 = new MyKey(5);
-        MyKey key2 = new MyKey(6);
-        MyKey key3 = new MyKey(7);
-        MyKey key4 = new MyKey(8);
-        MyKey key5 = new MyKey(9);
-
-        System.out.print(key1.hashCode() + " ");
-        System.out.print(key2.hashCode() + " ");
-        System.out.print(key3.hashCode() + " ");
-        System.out.print(key4.hashCode() + " ");
-        System.out.print(key5.hashCode() + " ");
-
-        MyHashTable<Integer, Integer> hashTable = new MyHashTable<>();
-
-        hashTable.put(1, 1);
-        hashTable.put(1, 2);
-        System.out.println(hashTable.contains(2));
-        System.out.println(hashTable.contains(1));
-        System.out.println(hashTable.get(1));
-        System.out.println(hashTable.remove(1));
-        System.out.println(hashTable.get(1));
-
-        MyHashTable<String, Integer> newHashTable = new MyHashTable<>(100);
-
-        for (int i = 0; i < 1000; i++) {
-            double f = Math.random();
-            newHashTable.put(String.valueOf((char) (65 * (1.0 - f) + 122 * f)), i);
+    private static String getRandomString(int length) {
+        String dict = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+        StringBuilder builder = new StringBuilder();
+        while (builder.length() < length) { // length of the random string.
+            int index = rnd.nextInt(0,dict.length()-1);
+            builder.append(dict.charAt(index));
         }
+        return builder.toString();
+    }
 
-        System.out.println(newHashTable);
+    private static void insertHashTable(){
+        for (int i = 0; i < sampleSize; i++){
+            table.put(new TestMyHashTable(getRandomString(20)), i);
+        }
+    }
 
-        TestMyHashTable.testIt();
+    private static void printBucketsAndStatistics(){
+        List<Integer> bucketSizes = table.getBucketSizes();
+        double usedBuckets = 0, sum = 0, max = 0, aboveAvg = 0;
+        for(int i = 0; i < bucketSizes.size(); i++){
+            if(bucketSizes.get(i) != 0){
+                usedBuckets++;
+                sum+=bucketSizes.get(i);
+                max = max(max, bucketSizes.get(i));
+            }
+            System.out.println("Bucket " + i + ": " + bucketSizes.get(i));
+        }
+        for(int i = 0; i < bucketSizes.size(); i++){
+            aboveAvg += (bucketSizes.get(i) > (sum/usedBuckets)?1:0);
+        }
+        System.out.println("Used buckets: " + usedBuckets + " / " + table.getM());
+        System.out.println("Avg per a non-empty bucket: " + (sum/usedBuckets));
+        System.out.println("Number of above avg sized buckets: " + aboveAvg);
+        System.out.println("Max in a bucket: " + max);
+        System.out.println("Unique keys: " + table.size());
+    }
+
+    private static void testMyHashTable(){
+        long startTime = System.currentTimeMillis();
+        insertHashTable();
+        long stopTime = System.currentTimeMillis();
+        long elapsedTime = stopTime - startTime;
+        printBucketsAndStatistics();
+        System.out.println("Elapsed time put " + sampleSize + " : " + elapsedTime + " mils");
+    }
+
+    private static void testBST(){
+        long startTime = System.currentTimeMillis();
+        for (int i = 0; i < 10; i++){
+            tree.put(rnd.nextInt(), i);
+        }
+        long stopTime = System.currentTimeMillis();
+        long elapsedTime = stopTime - startTime;
+        for (var elem : tree) {
+            System.out.println("key is " + elem.getKey() + " and value is " + elem.getValue());
+        }
+        System.out.println("Tree size: " + tree.size());
+        System.out.println("Elapsed time put 10 : " + elapsedTime + " mils");
+    }
+
+    public static void main(String[] args){
+        testMyHashTable();
+        System.out.println("\n------------------------------------------------\n");
+        testBST();
     }
 }
