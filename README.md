@@ -45,7 +45,7 @@ In this method:
 
 ## HashTable
 
-The hash table is implemented using the separate chaining method for collision resolution. This approach provides an amortized time complexity of \(O(1)\), with a worst-case time complexity of \(O(N)\). Reference: Sedgewick, R., & Wayne, K. (2011). *Algorithms*. Addison-Wesley Professional.
+The hash table is implemented using the separate chaining method for collision resolution. This approach provides an amortized time complexity of \(O(1)\), with a worst-case time complexity of \(O(N)\).
 
 ### Methods
 
